@@ -119,7 +119,7 @@ namespace ranges {
             requires (_Range_adaptor_closure_object<_Right> && range<_Left>)
         _NODISCARD constexpr decltype(auto) operator|(_Left&& __l, _Right&& __r)
             noexcept(noexcept(_STD forward<_Right>(__r)(_STD forward<_Left>(__l))))
-            requires requires { static_cast<_Right&&>(__r)(static_cast<_Left&&>(__l)); }
+            requires requires { static_cast<_Right &&>(__r)(static_cast<_Left &&>(__l)); }
         {
             return _STD forward<_Right>(__r)(_STD forward<_Left>(__l));
         }
@@ -461,7 +461,7 @@ namespace ranges {
         template <_Different_from<ref_view> _OtherRng>
         constexpr ref_view(_OtherRng&& _Other)
             noexcept(noexcept(static_cast<_Rng&>(_STD forward<_OtherRng>(_Other)))) // strengthened
-            requires convertible_to<_OtherRng, _Rng&> && requires { _Rvalue_poison(static_cast<_OtherRng&&>(_Other)); }
+            requires convertible_to<_OtherRng, _Rng&> && requires { _Rvalue_poison(static_cast<_OtherRng &&>(_Other)); }
             : _Range{_STD addressof(static_cast<_Rng&>(_STD forward<_OtherRng>(_Other)))} {}
 
         _NODISCARD constexpr _Rng& base() const noexcept /* strengthened */ {
@@ -591,10 +591,10 @@ namespace ranges {
 
     namespace views {
         template <class _Rng>
-        concept _Can_ref_view = requires(_Rng&& __r) { ref_view{static_cast<_Rng&&>(__r)}; };
+        concept _Can_ref_view = requires(_Rng&& __r) { ref_view{static_cast<_Rng &&>(__r)}; };
 
         template <class _Rng>
-        concept _Ownable = requires(_Rng&& __r) { owning_view{static_cast<_Rng&&>(__r)}; };
+        concept _Ownable = requires(_Rng&& __r) { owning_view{static_cast<_Rng &&>(__r)}; };
 
         class _All_fn : public _Pipe::_Base<_All_fn> {
         private:
@@ -1048,7 +1048,7 @@ namespace ranges {
             template <viewable_range _Rng, class _Fn>
             _NODISCARD _STATIC_CALL_OPERATOR constexpr auto operator()(_Rng&& _Range, _Fn _Fun) _CONST_CALL_OPERATOR
                 noexcept(noexcept(transform_view(_STD forward<_Rng>(_Range), _STD move(_Fun))))
-                requires requires { transform_view(static_cast<_Rng&&>(_Range), _STD move(_Fun)); }
+                requires requires { transform_view(static_cast<_Rng &&>(_Range), _STD move(_Fun)); }
             {
                 return transform_view(_STD forward<_Rng>(_Range), _STD move(_Fun));
             }
@@ -1106,9 +1106,10 @@ namespace ranges {
     _EXPORT_STD template <class _Container, input_range _Rng, class... _Types>
         requires (!view<_Container>)
     _NODISCARD constexpr _Container to(_Rng&& _Range, _Types&&... _Args) {
-        static_assert(!is_const_v<_Container>, "C must not be const. ([range.utility.conv.to])");
-        static_assert(!is_volatile_v<_Container>, "C must not be volatile. ([range.utility.conv.to])");
-        static_assert(is_class_v<_Container>, "C must be a class type. ([range.utility.conv.to])");
+        static_assert(!is_const_v<_Container>, "C must not be const. (N5014 [range.utility.conv.to]/1)");
+        static_assert(!is_volatile_v<_Container>, "C must not be volatile. (N5014 [range.utility.conv.to]/1)");
+        static_assert(is_class_v<_Container> || is_union_v<_Container>,
+            "C must be a class type. (N5014 [range.utility.conv.to]/1)");
         if constexpr (_Ref_converts<_Rng, _Container>) {
             if constexpr (constructible_from<_Container, _Rng, _Types...>) {
                 return _Container(_STD forward<_Rng>(_Range), _STD forward<_Types>(_Args)...);
@@ -1142,7 +1143,7 @@ namespace ranges {
             } else {
                 static_assert(false, "ranges::to requires the result to be constructible from the source range, either "
                                      "by using a suitable constructor, or by inserting each element of the range into "
-                                     "the default-constructed object. (N4981 [range.utility.conv.to]/2.1.5)");
+                                     "the default-constructed object. (N5014 [range.utility.conv.to]/2.1.5)");
             }
         } else if constexpr (input_range<range_reference_t<_Rng>>) {
             const auto _Xform = [](auto&& _Elem) _STATIC_LAMBDA {
@@ -1153,7 +1154,7 @@ namespace ranges {
             static_assert(false,
                 "ranges::to requires the elements of the source range to be either implicitly convertible to the "
                 "elements of the destination container, or be ranges themselves for ranges::to to be applied "
-                "recursively. (N4981 [range.utility.conv.to]/2.3)");
+                "recursively. (N5014 [range.utility.conv.to]/2.3)");
         }
     }
 
@@ -1161,7 +1162,7 @@ namespace ranges {
     struct _To_class_fn {
         _STL_INTERNAL_STATIC_ASSERT(!is_const_v<_Container>);
         _STL_INTERNAL_STATIC_ASSERT(!is_volatile_v<_Container>);
-        _STL_INTERNAL_STATIC_ASSERT(is_class_v<_Container>);
+        _STL_INTERNAL_STATIC_ASSERT(is_class_v<_Container> || is_union_v<_Container>);
         _STL_INTERNAL_STATIC_ASSERT(!view<_Container>);
 
         template <input_range _Rng, class... _Types>
@@ -1176,9 +1177,10 @@ namespace ranges {
     _EXPORT_STD template <class _Container, class... _Types>
         requires (!view<_Container>)
     _NODISCARD constexpr auto to(_Types&&... _Args) {
-        static_assert(!is_const_v<_Container>, "C must not be const. ([range.utility.conv.adaptors])");
-        static_assert(!is_volatile_v<_Container>, "C must not be volatile. ([range.utility.conv.adaptors])");
-        static_assert(is_class_v<_Container>, "C must be a class type. ([range.utility.conv.adaptors])");
+        static_assert(!is_const_v<_Container>, "C must not be const. (N5014 [range.utility.conv.adaptors]/1)");
+        static_assert(!is_volatile_v<_Container>, "C must not be volatile. (N5014 [range.utility.conv.adaptors]/1)");
+        static_assert(is_class_v<_Container> || is_union_v<_Container>,
+            "C must be a class type. (N5014 [range.utility.conv.adaptors]/1)");
         return _Range_closure<_To_class_fn<_Container>, decay_t<_Types>...>{_STD forward<_Types>(_Args)...};
     }
 
